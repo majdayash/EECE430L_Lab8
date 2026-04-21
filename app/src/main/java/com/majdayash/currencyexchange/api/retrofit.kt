@@ -1,12 +1,15 @@
 package com.majdayash.currencyexchange.api
 
 import com.majdayash.currencyexchange.api.model.ExchangeRates
+import com.majdayash.currencyexchange.api.model.Token
 import com.majdayash.currencyexchange.api.model.Transaction
+import com.majdayash.currencyexchange.api.model.User
 import retrofit2.Call
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.POST
 
 object ExchangeService {
@@ -27,5 +30,17 @@ interface Exchange {
     fun getExchangeRates(): Call<ExchangeRates>
 
     @POST("/transaction")
-    fun addTransaction(@Body transaction: Transaction): Call<Any>
+    fun addTransaction(
+        @Body transaction: Transaction,
+        @Header("Authorization") authorization: String?
+    ): Call<Any>
+
+    @GET("/transaction")
+    fun getTransactions(@Header("Authorization") authorization: String): Call<List<Transaction>>
+
+    @POST("/user")
+    fun addUser(@Body user: User): Call<User>
+
+    @POST("/authentication")
+    fun authenticate(@Body user: User): Call<Token>
 }

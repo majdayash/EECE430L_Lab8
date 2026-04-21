@@ -1,17 +1,22 @@
 package com.majdayash.currencyexchange
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.widget.RadioGroup
-import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.snackbar.Snackbar
+import com.google.android.material.tabs.TabLayout
+import com.google.android.material.tabs.TabLayoutMediator
 import com.google.android.material.textfield.TextInputLayout
+import com.majdayash.currencyexchange.api.Authentication
 import com.majdayash.currencyexchange.api.ExchangeService
-import com.majdayash.currencyexchange.api.model.ExchangeRates
 import com.majdayash.currencyexchange.api.model.Transaction
 import retrofit2.Call
 import retrofit2.Callback
@@ -19,46 +24,74 @@ import retrofit2.Response
 
 class MainActivity : AppCompatActivity() {
 
-    private var buyUsdTextView: TextView? = null
-    private var sellUsdTextView: TextView? = null
+    private var menu: Menu? = null
+    private var tabLayout: TabLayout? = null
+    private var tabsViewPager: ViewPager2? = null
     private var fab: FloatingActionButton? = null
     private var transactionDialog: View? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Authentication.initialize(this)
         setContentView(R.layout.activity_main)
 
-        buyUsdTextView = findViewById(R.id.txtBuyUsdRate)
-        sellUsdTextView = findViewById(R.id.txtSellUsdRate)
+        tabLayout = findViewById(R.id.tabLayout)
+        tabsViewPager = findViewById(R.id.tabsViewPager)
+
+        tabLayout?.tabMode = TabLayout.MODE_FIXED
+        tabLayout?.isInlineLabel = true
+
+        tabsViewPager?.isUserInputEnabled = true
+        val adapter = TabsPagerAdapter(supportFragmentManager, lifecycle)
+        tabsViewPager?.adapter = adapter
+
+        if (tabLayout != null && tabsViewPager != null) {
+            TabLayoutMediator(tabLayout!!, tabsViewPager!!) { tab, position ->
+                when (position) {
+                    0 -> tab.text = "Exchange"
+                    1 -> tab.text = "Transactions"
+                }
+            }.attach()
+        }
 
         fab = findViewById(R.id.fab)
         fab?.setOnClickListener {
             showDialog()
         }
-
-        fetchRates()
     }
 
-    private fun fetchRates() {
-        ExchangeService.exchangeApi().getExchangeRates().enqueue(object : Callback<ExchangeRates> {
-            override fun onResponse(call: Call<ExchangeRates>, response: Response<ExchangeRates>) {
-                val responseBody: ExchangeRates? = response.body()
-                val buyRate = responseBody?.lbpToUsd
-                val sellRate = responseBody?.usdToLbp
+    override fun onResume() {
+        super.onResume()
+        setMenu()
+    }
 
-                if (buyRate != null) {
-                    buyUsdTextView?.text = buyRate.toString()
-                }
+    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+        this.menu = menu
+        setMenu()
+        return true
+    }
 
-                if (sellRate != null) {
-                    sellUsdTextView?.text = sellRate.toString()
-                }
-            }
+    private fun setMenu() {
+        val currentMenu = menu ?: return
+        currentMenu.clear()
+        menuInflater.inflate(
+            if (Authentication.getToken() == null) R.menu.menu_logged_out else R.menu.menu_logged_in,
+            currentMenu
+        )
+    }
 
-            override fun onFailure(call: Call<ExchangeRates>, t: Throwable) {
-                showMessage("Could not fetch exchange rates.")
-            }
-        })
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        if (item.itemId == R.id.login) {
+            val intent = Intent(this, LoginActivity::class.java)
+            startActivity(intent)
+        } else if (item.itemId == R.id.register) {
+            val intent = Intent(this, RegistrationActivity::class.java)
+            startActivity(intent)
+        } else if (item.itemId == R.id.logout) {
+            Authentication.clearToken()
+            setMenu()
+        }
+        return true
     }
 
     private fun showDialog() {
@@ -103,16 +136,22 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun addTransaction(transaction: Transaction) {
-        ExchangeService.exchangeApi().addTransaction(transaction).enqueue(object : Callback<Any> {
-            override fun onResponse(call: Call<Any>, response: Response<Any>) {
-                showMessage("Transaction added!")
-                fetchRates()
-            }
+        val authorization = if (Authentication.getToken() != null) {
+            "Bearer ${Authentication.getToken()}"
+        } else {
+            null
+        }
 
-            override fun onFailure(call: Call<Any>, t: Throwable) {
-                showMessage("Could not add transaction.")
-            }
-        })
+        ExchangeService.exchangeApi().addTransaction(transaction, authorization)
+            .enqueue(object : Callback<Any> {
+                override fun onResponse(call: Call<Any>, response: Response<Any>) {
+                    showMessage("Transaction added!")
+                }
+
+                override fun onFailure(call: Call<Any>, t: Throwable) {
+                    showMessage("Could not add transaction.")
+                }
+            })
     }
 
     private fun showMessage(message: String) {

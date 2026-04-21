@@ -3,6 +3,9 @@ package com.majdayash.currencyexchange.api.model
 import com.google.gson.annotations.SerializedName
 
 class Transaction {
+    @SerializedName("id")
+    var id: Int? = null
+
     @SerializedName("usd_amount")
     var usdAmount: Float? = null
 
@@ -11,4 +14,7 @@ class Transaction {
 
     @SerializedName("usd_to_lbp")
     var usdToLbp: Boolean? = null
+
+    @SerializedName("added_date")
+    var addedDate: String? = null
 }
